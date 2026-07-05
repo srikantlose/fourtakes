@@ -1,0 +1,14 @@
+.git
+.gitignore
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.env
+.env.local
+output
+.temp
+*.log
+tests
+docker
+*.md

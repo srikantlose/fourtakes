@@ -117,7 +117,8 @@ class TestFrameExtractor(unittest.TestCase):
     @patch("subprocess.run")
     def test_extract_audio_timeout(self, mock_run):
         """Test extract_audio with timeout."""
-        mock_run.side_effect = TimeoutError()
+        import subprocess
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="ffmpeg", timeout=300)
 
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
             temp_file = f.name

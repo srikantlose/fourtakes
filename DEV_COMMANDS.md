@@ -159,7 +159,7 @@ pip install -r requirements.txt
 
 ### Build Docker image
 ```bash
-docker build -f docker/Dockerfile -t fourtakes:latest .
+docker build -t fourtakes:latest .
 ```
 
 ### Run Docker container

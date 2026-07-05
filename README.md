@@ -1,166 +1,150 @@
 # FourTakes: Video Captioning Pipeline
 
-Generate four distinctly-voiced captions (Formal, Sarcastic, Humorous-Tech, Humorous-Non-Tech) for short video clips using vision models and the Fireworks AI API.
+Generate four distinctly-voiced captions — **Formal**, **Sarcastic**, **Humorous-Tech**, and **Humorous-Non-Tech** — for short video clips (30 sec–2 min) using vision models via the Fireworks AI API.
+
+Built for AMD Developer Hackathon: ACT II, Track 2 (Video Captioning).
+
+## How It Works
+
+```
+video clip
+  → extract frames with ffmpeg (every 1.5s, configurable)
+  → downsample to MAX_FRAMES (evenly, keeping first + last frame)
+  → extract audio + transcribe via Fireworks-hosted Whisper (optional, best-effort)
+  → ONE vision-model call: neutral factual base caption
+  → FOUR text-model calls: transform base caption into each style
+  → JSON result per video + combined results file
+```
+
+The base caption is generated **once** per video and reused for all four styles, so the outputs stay factually consistent and vision-call costs stay low.
+
+## Key Design Rules
+
+- **No hardcoded model names.** The caption model comes from `FIREWORKS_CAPTION_MODEL` (env var or `--model` flag). Launch-day model swaps are a config change, not a code change.
+- **Mock mode** (`MOCK_MODE=true` or `--mock`): the entire pipeline runs with canned API responses — no key, no credits, no network. Used for development and CI.
+- **Best-effort audio**: transcription failures never break captioning; the pipeline continues on frames alone.
+- **Batch-safe**: one broken video in a directory never aborts the others; its error is recorded in its own result entry.
+- **Every API call is logged** with model name, tokens, latency, and status.
 
 ## Project Structure
 
 ```
 fourtakes/
-├── src/                    # Core pipeline code
-│   ├── __init__.py
-│   ├── config.py          # Configuration loader (env vars)
-│   ├── frame_extractor.py # Video frame extraction
-│   ├── whisper_client.py  # Audio transcription (Phase 2)
-│   ├── fireworks_client.py # Fireworks API wrapper (Phase 2)
-│   ├── captioner.py       # Base caption generation (Phase 2)
-│   └── main.py            # CLI entrypoint (Phase 3+)
-├── tests/                  # Unit and integration tests
-│   ├── __init__.py
-│   └── test_frame_extractor.py
-├── docker/                 # Docker configuration
-│   └── Dockerfile         # (Phase 5)
-├── config/                 # Configuration files
-│   └── prompts.json       # Style prompts (Phase 3)
-├── .env.template          # Environment variable template
-├── requirements.txt       # Python dependencies
-└── README.md             # This file
+├── src/
+│   ├── config.py            # env-based config + prompts loader
+│   ├── frame_extractor.py   # ffmpeg frame/audio extraction
+│   ├── fireworks_client.py  # Fireworks API wrapper (retries, logging, mock mode)
+│   ├── transcriber.py       # Fireworks-hosted Whisper transcription
+│   ├── captioner.py         # base caption + 4 style transforms
+│   ├── pipeline.py          # end-to-end orchestrator + JSON output
+│   ├── logging_config.py    # file + console logging
+│   └── main.py              # CLI entrypoint
+├── config/
+│   └── prompts.json         # ALL prompts (base + 4 styles) — edit here to iterate
+├── tests/                   # unit + integration tests (no API key or ffmpeg needed)
+├── Dockerfile
+├── .env.template            # copy to .env.local and fill in
+└── requirements.txt
 ```
 
-## Setup (Phase 1)
+## Setup
 
-### Prerequisites
-- **Python 3.9+**
-- **ffmpeg** and **ffprobe** (for frame extraction)
-
-#### Install ffmpeg
-
-**Windows (PowerShell with Chocolatey):**
-```powershell
-choco install ffmpeg
-```
-
-**macOS:**
-```bash
-brew install ffmpeg
-```
-
-**Linux (Ubuntu/Debian):**
-```bash
-sudo apt-get install ffmpeg
-```
-
-Verify installation:
-```bash
-ffmpeg -version
-ffprobe -version
-```
-
-### Configuration
-
-1. **Copy environment template:**
-   ```bash
-   cp .env.template .env.local
-   ```
-
-2. **Edit `.env.local` with your settings:**
-   ```
-   FIREWORKS_API_KEY=your_key_here
-   FIREWORKS_CAPTION_MODEL=accounts/fireworks/models/phi-4-vision-128k
-   FRAME_INTERVAL_SECONDS=1.5
-   ENABLE_AUDIO_TRANSCRIPTION=true
-   OPENAI_API_KEY=your_openai_key_for_whisper
-   ```
-
-3. **Create Python virtual environment:**
-   ```bash
-   python -m venv venv
-   # Windows
-   .\venv\Scripts\activate
-   # macOS/Linux
-   source venv/bin/activate
-   ```
-
-4. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Phase 1 Status: ✓ COMPLETE
-
-- [x] Project directory structure created
-- [x] Python requirements.txt configured
-- [x] Config loader implemented (reads .env files)
-- [x] Frame extraction module (ffmpeg wrapper)
-- [x] Unit tests for frame extraction
-- [x] Documentation
-
-### What's Working
-- **Frame Extraction:** Extract frames from video files at configurable intervals
-- **Video Metadata:** Retrieve video duration, FPS, resolution
-- **Audio Extraction:** Extract audio tracks from videos (for Whisper transcription)
-- **Configuration:** Load settings from .env files with sensible defaults
-
-### How to Test Frame Extraction
-
-```python
-from src.frame_extractor import FrameExtractor
-
-extractor = FrameExtractor(frame_interval=1.5)  # 1 frame every 1.5 seconds
-
-# Extract frames
-frames, metadata = extractor.extract_frames("sample_video.mp4")
-print(f"Extracted {len(frames)} frames")
-print(f"Frame paths: {frames}")
-print(f"Metadata: {metadata}")
-
-# Get video duration
-duration = extractor.get_video_duration("sample_video.mp4")
-print(f"Video duration: {duration} seconds")
-```
-
-### Run Unit Tests
+Prerequisites: Python 3.9+, ffmpeg/ffprobe on PATH.
 
 ```bash
-python -m pytest tests/test_frame_extractor.py -v
-# Or
-python -m unittest tests.test_frame_extractor -v
+# 1. Install dependencies
+python -m venv venv
+venv\Scripts\activate          # Windows  (source venv/bin/activate on mac/linux)
+pip install -r requirements.txt
+
+# 2. Configure
+copy .env.template .env.local   # then edit: set FIREWORKS_API_KEY
 ```
 
-## Next Phase: Phase 2 (Fireworks API & Base Captions)
+## Usage
 
-Planned for Days 3–5:
-- [ ] Implement Fireworks API client (mocked first, then real)
-- [ ] Integrate Whisper API for audio transcription
-- [ ] Implement base caption generation
-- [ ] Add retry logic and error handling
-- [ ] Integration tests with mocked API
+```bash
+# Single video
+python -m src.main path/to/clip.mp4
+
+# Directory of videos
+python -m src.main path/to/videos/ --output-dir results
+
+# No API key yet? Run in mock mode (full pipeline, canned captions)
+python -m src.main path/to/clip.mp4 --mock
+
+# Override the model for one run (e.g., launch day)
+python -m src.main clip.mp4 --model accounts/fireworks/models/launch-day-model
+
+# Skip audio transcription
+python -m src.main clip.mp4 --no-audio
+```
+
+Output per video (`output/<video_id>.json`):
+
+```json
+{
+  "video_id": "clip",
+  "status": "ok",
+  "base_caption": "...neutral factual description...",
+  "captions": {
+    "formal": "...",
+    "sarcastic": "...",
+    "humorous_tech": "...",
+    "humorous_nontech": "..."
+  },
+  "metadata": {
+    "model_used": "...", "frames_extracted": 23, "frames_sent_to_model": 16,
+    "audio_transcribed": true, "duration_seconds": 35.0, "...": "..."
+  }
+}
+```
+
+`output/all_results.json` additionally includes an `api_usage` summary (total calls, tokens, errors).
+
+## Docker
+
+```bash
+docker build -t fourtakes .
+
+docker run \
+  -e FIREWORKS_API_KEY=your_key \
+  -e FIREWORKS_CAPTION_MODEL=accounts/fireworks/models/whatever-is-revealed \
+  -v /path/to/videos:/videos \
+  -v /path/to/output:/app/output \
+  fourtakes /videos
+
+# Mock-mode smoke test (no key needed):
+docker run -v /path/to/videos:/videos -v /path/to/output:/app/output fourtakes /videos --mock
+```
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+22 tests, all runnable offline — no API key, credits, or ffmpeg required (extraction and API calls are mocked).
 
 ## Configuration Reference
 
-### Environment Variables
-
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FIREWORKS_API_KEY` | (required) | Fireworks API key for model access |
-| `FIREWORKS_CAPTION_MODEL` | `phi-4-vision-128k` | Vision model to use for captions |
+| `FIREWORKS_API_KEY` | (empty → mock mode) | Fireworks API key |
+| `FIREWORKS_CAPTION_MODEL` | `accounts/fireworks/models/phi-4-vision-128k` | Vision model — swap on launch day |
+| `FIREWORKS_TRANSCRIPTION_MODEL` | `whisper-v3` | Fireworks-hosted Whisper model |
+| `MOCK_MODE` | `false` | Force canned responses, no API calls |
 | `FRAME_INTERVAL_SECONDS` | `1.5` | Seconds between extracted frames |
-| `ENABLE_AUDIO_TRANSCRIPTION` | `true` | Enable audio transcription |
-| `OPENAI_API_KEY` | (optional) | OpenAI key for Whisper (if using OpenAI) |
-| `LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
-| `LOG_FILE` | `fourtakes.log` | Path to log file |
-| `OUTPUT_DIR` | `output` | Directory for JSON outputs |
-| `TEMP_DIR` | `.temp` | Directory for temporary files |
+| `MAX_FRAMES` | `16` | Cap on frames sent to the model (evenly sampled) |
+| `ENABLE_AUDIO_TRANSCRIPTION` | `true` | Transcribe audio for extra caption context |
+| `PROMPTS_PATH` | `config/prompts.json` | Prompt definitions file |
+| `LOG_LEVEL` / `LOG_FILE` | `INFO` / `fourtakes.log` | Logging |
+| `OUTPUT_DIR` / `TEMP_DIR` | `output` / `.temp` | Directories |
+
+## Editing the Caption Styles
+
+All five prompts (base + four styles) live in [config/prompts.json](config/prompts.json). Edit that file to iterate on caption voice — no code changes needed.
 
 ## License
 
-MIT License
-
-## Project Timeline
-
-- **Phase 1** (Days 1–2): ✓ DONE
-- **Phase 2** (Days 3–5): API integration & base captions
-- **Phase 3** (Days 5–6): Style transformation prompts
-- **Phase 4** (Days 7–8): Polish and optimization
-- **Phase 5** (Days 9–10): Containerization
-- **Phase 6** (Day 10–11): Launch-day readiness
-- **Phase 7** (Optional): Fine-tuning with ActivityNet Captions
+MIT

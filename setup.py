@@ -22,11 +22,8 @@ setup(
     ],
     python_requires=">=3.9",
     install_requires=[
-        "ffmpeg-python==0.2.1",
-        "Pillow==10.1.0",
-        "requests==2.31.0",
-        "python-dotenv==1.0.0",
-        "openai==1.3.0",
+        "requests>=2.31.0",
+        "python-dotenv>=1.0.0",
     ],
     extras_require={
         "dev": [
