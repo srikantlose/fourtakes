@@ -195,26 +195,34 @@ pip install -r requirements.txt
 
 ## Docker
 
-### Build (submission image: key + model baked in, judging injects nothing)
+### Build (submission image — no credentials baked; judging injects env vars at runtime)
 ```bash
+docker build -t fourtakes:latest .
+```
+
+### Simulate the judging harness (runtime env injection)
+```bash
+docker run \
+  -e FIREWORKS_API_KEY=your_key \
+  -e FIREWORKS_BASE_URL=https://api.fireworks.ai/inference/v1 \
+  -v "$(pwd)/input:/input" \
+  -v "$(pwd)/output:/output" \
+  fourtakes:latest
+```
+
+### Optional: bake fallback credentials at build time
+```bash
+# Runtime env vars always override baked values. Only needed if the image
+# must also work somewhere that injects nothing.
 docker build \
   --build-arg FIREWORKS_API_KEY=your_key \
   --build-arg FIREWORKS_CAPTION_MODEL=accounts/fireworks/models/qwen3p7-plus \
   -t fourtakes:latest .
 ```
 
-### Simulate the judging harness
+### Mock-mode smoke test (no key anywhere => mock mode)
 ```bash
-docker run \
-  -v "$(pwd)/input:/input" \
-  -v "$(pwd)/output:/output" \
-  fourtakes:latest
-```
-
-### Mock-mode smoke test (build without a key => mock mode)
-```bash
-docker build -t fourtakes-mock .
-docker run -v "$(pwd)/input:/input" -v "$(pwd)/output:/output" fourtakes-mock
+docker run -v "$(pwd)/input:/input" -v "$(pwd)/output:/output" fourtakes:latest
 ```
 
 ### Local dev run against a mounted video

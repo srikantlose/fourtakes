@@ -5,24 +5,27 @@ mock mode and frame/audio extraction is patched out.
 """
 
 import json
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.captioner import Captioner, STYLE_KEYS
-from src.config import load_prompts
+from src.config import load_config, load_prompts
 from src.fireworks_client import FireworksClient, MOCK_BASE_CAPTION
 from src.pipeline import FourTakesPipeline, downsample_frames
+from src.transcriber import Transcriber
 
 
 def make_test_config(**overrides) -> dict:
     config = {
         "fireworks_api_key": "",
+        "fireworks_base_url": "https://api.fireworks.ai/inference/v1",
         "fireworks_caption_model": "test/model-from-config",
         "fireworks_transcription_model": "whisper-v3",
         "mock_mode": True,
@@ -89,6 +92,82 @@ class TestMockClient(unittest.TestCase):
         summary = client.usage_summary()
         self.assertEqual(summary["calls"], 1)
         self.assertTrue(summary["mock_mode"])
+
+
+class TestBaseUrl(unittest.TestCase):
+    """The judging harness injects FIREWORKS_BASE_URL at runtime — every
+    HTTP call must route through the configured base URL, never a
+    hardcoded one."""
+
+    def test_config_reads_base_url_from_env(self):
+        with patch.dict(
+            os.environ, {"FIREWORKS_BASE_URL": "http://judge.proxy:8000/v1/"}
+        ):
+            config = load_config()
+        self.assertEqual(
+            config["fireworks_base_url"], "http://judge.proxy:8000/v1"
+        )
+
+    def test_config_empty_base_url_falls_back_to_default(self):
+        # Empty string = Docker image built without the optional ARG
+        with patch.dict(os.environ, {"FIREWORKS_BASE_URL": ""}):
+            config = load_config()
+        self.assertEqual(
+            config["fireworks_base_url"],
+            "https://api.fireworks.ai/inference/v1",
+        )
+
+    def test_client_posts_to_configured_base_url(self):
+        client = FireworksClient(
+            api_key="fake-key",
+            model="test/model-from-config",
+            base_url="http://judge.proxy:8000/v1",
+        )
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "choices": [{"message": {"content": "a caption"}}],
+            "usage": {"total_tokens": 10},
+        }
+        with patch(
+            "src.fireworks_client.requests.post", return_value=response
+        ) as mock_post:
+            text = client.chat_completion([{"role": "user", "content": "hi"}])
+        self.assertEqual(text, "a caption")
+        self.assertEqual(
+            mock_post.call_args[0][0],
+            "http://judge.proxy:8000/v1/chat/completions",
+        )
+
+    def test_client_strips_trailing_slash(self):
+        client = FireworksClient(
+            api_key="fake-key", model="m", base_url="http://judge.proxy/v1/"
+        )
+        self.assertEqual(
+            client.chat_url, "http://judge.proxy/v1/chat/completions"
+        )
+
+    def test_transcriber_url_from_base_url(self):
+        transcriber = Transcriber(
+            api_key="fake-key", base_url="http://judge.proxy:8000/v1"
+        )
+        self.assertEqual(
+            transcriber.transcription_url,
+            "http://judge.proxy:8000/v1/audio/transcriptions",
+        )
+
+    def test_pipeline_threads_base_url_to_client_and_transcriber(self):
+        config = make_test_config(
+            fireworks_base_url="http://judge.proxy:8000/v1"
+        )
+        pipeline = FourTakesPipeline(config, load_prompts())
+        self.assertEqual(
+            pipeline.client.chat_url,
+            "http://judge.proxy:8000/v1/chat/completions",
+        )
+        self.assertEqual(
+            pipeline.transcriber.transcription_url,
+            "http://judge.proxy:8000/v1/audio/transcriptions",
+        )
 
 
 class TestCaptioner(unittest.TestCase):

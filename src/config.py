@@ -25,6 +25,13 @@ def load_config():
 
     return {
         "fireworks_api_key": os.getenv("FIREWORKS_API_KEY", ""),
+        # The judging harness injects FIREWORKS_BASE_URL at runtime (its
+        # token-recording proxy). Empty/unset falls through to the public
+        # Fireworks endpoint for local development.
+        "fireworks_base_url": (
+            os.getenv("FIREWORKS_BASE_URL")
+            or "https://api.fireworks.ai/inference/v1"
+        ).rstrip("/"),
         "fireworks_caption_model": os.getenv("FIREWORKS_CAPTION_MODEL")
         or "accounts/fireworks/models/qwen3p7-plus",
         "fireworks_transcription_model": os.getenv("FIREWORKS_TRANSCRIPTION_MODEL")

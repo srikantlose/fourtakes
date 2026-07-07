@@ -15,11 +15,9 @@ from typing import Optional
 
 import requests
 
-logger = logging.getLogger(__name__)
+from .fireworks_client import DEFAULT_BASE_URL
 
-FIREWORKS_TRANSCRIPTION_URL = (
-    "https://api.fireworks.ai/inference/v1/audio/transcriptions"
-)
+logger = logging.getLogger(__name__)
 
 MOCK_TRANSCRIPT = (
     "Good catch, buddy! Go get it! [dog barking] That's a good boy."
@@ -32,6 +30,7 @@ class Transcriber:
     Args:
         api_key: Fireworks API key. Empty string enables mock mode.
         model: Transcription model name from config.
+        base_url: OpenAI-compatible API base URL (see FireworksClient).
         mock_mode: Force mock transcripts even if an API key is set.
         max_retries: Retry attempts per call.
         timeout: Per-request timeout in seconds.
@@ -41,12 +40,14 @@ class Transcriber:
         self,
         api_key: str,
         model: str = "whisper-v3",
+        base_url: str = DEFAULT_BASE_URL,
         mock_mode: bool = False,
         max_retries: int = 2,
         timeout: int = 120,
     ):
         self.api_key = api_key
         self.model = model
+        self.transcription_url = f"{base_url.rstrip('/')}/audio/transcriptions"
         self.mock_mode = mock_mode or not api_key
         self.max_retries = max_retries
         self.timeout = timeout
@@ -78,7 +79,7 @@ class Transcriber:
             try:
                 with open(audio_path, "rb") as f:
                     response = requests.post(
-                        FIREWORKS_TRANSCRIPTION_URL,
+                        self.transcription_url,
                         headers=headers,
                         files={"file": f},
                         data={"model": self.model},

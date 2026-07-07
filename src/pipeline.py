@@ -44,15 +44,20 @@ class FourTakesPipeline:
 
     def __init__(self, config: dict, prompts: dict):
         self.config = config
+        base_url = config.get(
+            "fireworks_base_url", "https://api.fireworks.ai/inference/v1"
+        )
         self.client = FireworksClient(
             api_key=config["fireworks_api_key"],
             model=config["fireworks_caption_model"],
+            base_url=base_url,
             mock_mode=config["mock_mode"],
             timeout=config.get("api_timeout", 60),
         )
         self.transcriber = Transcriber(
             api_key=config["fireworks_api_key"],
             model=config["fireworks_transcription_model"],
+            base_url=base_url,
             mock_mode=config["mock_mode"] or not config["fireworks_api_key"],
         )
         self.captioner = Captioner(self.client, prompts)

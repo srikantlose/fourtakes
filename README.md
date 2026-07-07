@@ -78,7 +78,7 @@ fourtakes/
 │   └── main.py              # CLI entrypoint (submission + dev modes)
 ├── config/
 │   └── prompts.json         # ALL prompts (base + styles + generic) — edit here
-├── tests/                   # 34 tests, all runnable offline
+├── tests/                   # 40 tests, all runnable offline
 ├── Dockerfile
 ├── .env.template            # copy to .env.local and fill in
 └── requirements.txt
@@ -117,28 +117,35 @@ python -m src.main clip.mp4 --model accounts/fireworks/models/some-model
 
 ## Docker
 
-Track 2 injects **no** environment variables at judging time, so credentials and the model ID are supplied at build time:
+The judging harness injects `FIREWORKS_API_KEY` and `FIREWORKS_BASE_URL` (its API proxy) as **environment variables at container runtime**. The code reads both from the environment at startup, so the submission image needs no credentials baked in:
 
 ```bash
-docker build \
-  --build-arg FIREWORKS_API_KEY=your_key \
-  --build-arg FIREWORKS_CAPTION_MODEL=accounts/fireworks/models/qwen3p7-plus \
-  -t fourtakes .
+docker build -t fourtakes .
 
-# Simulate the judging harness locally:
+# Simulate the judging harness locally (runtime env injection):
 docker run \
+  -e FIREWORKS_API_KEY=your_key \
+  -e FIREWORKS_BASE_URL=https://api.fireworks.ai/inference/v1 \
   -v /path/to/input:/input \
   -v /path/to/output:/output \
   fourtakes
 
-# Mock-mode smoke test (no key baked in => mock mode automatically):
-docker build -t fourtakes-mock .
-docker run -v /path/to/input:/input -v /path/to/output:/output fourtakes-mock
+# Mock-mode smoke test (no key anywhere => mock mode automatically):
+docker run -v /path/to/input:/input -v /path/to/output:/output fourtakes
 ```
+
+As a fallback (e.g. running the image somewhere that injects nothing), the same variables can optionally be baked at build time with `--build-arg FIREWORKS_API_KEY=... --build-arg FIREWORKS_CAPTION_MODEL=...`; runtime env vars always take precedence over baked values. If you do bake a key, remember the image is public once pushed — revoke the key after the event.
 
 The judging VM runs `linux/amd64`; standard builds on Intel/AMD machines produce that by default. On Apple Silicon add `--platform linux/amd64`.
 
-> Note: an image with a baked-in API key is public once pushed. Push shortly before submitting, keep only the credits you need on the key, and revoke it after the event.
+## Submission
+
+Track 2 deliverables, all linked from this repository:
+
+- **Code:** this repo — https://github.com/srikantlose/fourtakes
+- **Docker image:** _TODO — registry link once pushed_
+- **Demo video:** _TODO_
+- **Slide deck:** _TODO_
 
 ## Tests
 
@@ -146,13 +153,14 @@ The judging VM runs `linux/amd64`; standard builds on Intel/AMD machines produce
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-34 tests, all runnable offline — no API key, credits, or ffmpeg required (extraction, downloads, and API calls are mocked).
+40 tests, all runnable offline — no API key, credits, or ffmpeg required (extraction, downloads, and API calls are mocked).
 
 ## Configuration Reference
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FIREWORKS_API_KEY` | (empty → mock mode) | Fireworks API key |
+| `FIREWORKS_API_KEY` | (empty → mock mode) | Fireworks API key (injected at judging time) |
+| `FIREWORKS_BASE_URL` | `https://api.fireworks.ai/inference/v1` | API base URL (judging harness injects its proxy) |
 | `FIREWORKS_CAPTION_MODEL` | `accounts/fireworks/models/qwen3p7-plus` | Vision model (config-only, never hardcoded; must be serverless) |
 | `FIREWORKS_TRANSCRIPTION_MODEL` | `whisper-v3` | Fireworks-hosted Whisper model |
 | `MOCK_MODE` | `false` | Force canned responses, no API calls |

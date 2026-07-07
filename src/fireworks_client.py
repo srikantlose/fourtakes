@@ -19,7 +19,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-FIREWORKS_CHAT_URL = "https://api.fireworks.ai/inference/v1/chat/completions"
+DEFAULT_BASE_URL = "https://api.fireworks.ai/inference/v1"
 
 MOCK_BASE_CAPTION = (
     "A golden retriever runs across a grassy park chasing a red frisbee, "
@@ -60,6 +60,9 @@ class FireworksClient:
     Args:
         api_key: Fireworks API key. Empty string enables mock mode.
         model: Model identifier from config (never hardcoded).
+        base_url: OpenAI-compatible API base URL. The judging harness
+            injects its own via FIREWORKS_BASE_URL; defaults to the
+            public Fireworks endpoint.
         mock_mode: Force mock responses even if an API key is set.
         max_retries: Retry attempts per call.
         timeout: Per-request timeout in seconds.
@@ -69,12 +72,14 @@ class FireworksClient:
         self,
         api_key: str,
         model: str,
+        base_url: str = DEFAULT_BASE_URL,
         mock_mode: bool = False,
         max_retries: int = 3,
         timeout: int = 120,
     ):
         self.api_key = api_key
         self.model = model
+        self.chat_url = f"{base_url.rstrip('/')}/chat/completions"
         self.mock_mode = mock_mode or not api_key
         self.max_retries = max_retries
         self.timeout = timeout
@@ -159,7 +164,7 @@ class FireworksClient:
             start = time.time()
             try:
                 response = requests.post(
-                    FIREWORKS_CHAT_URL,
+                    self.chat_url,
                     json=payload,
                     headers=headers,
                     timeout=self.timeout,
