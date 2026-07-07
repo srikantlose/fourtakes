@@ -122,7 +122,7 @@ Track 2 injects **no** environment variables at judging time, so credentials and
 ```bash
 docker build \
   --build-arg FIREWORKS_API_KEY=your_key \
-  --build-arg FIREWORKS_CAPTION_MODEL=accounts/fireworks/models/qwen2p5-vl-32b-instruct \
+  --build-arg FIREWORKS_CAPTION_MODEL=accounts/fireworks/models/qwen3p7-plus \
   -t fourtakes .
 
 # Simulate the judging harness locally:
@@ -153,7 +153,7 @@ python -m unittest discover -s tests -p "test_*.py" -v
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `FIREWORKS_API_KEY` | (empty → mock mode) | Fireworks API key |
-| `FIREWORKS_CAPTION_MODEL` | `accounts/fireworks/models/qwen2p5-vl-32b-instruct` | Vision model (config-only, never hardcoded) |
+| `FIREWORKS_CAPTION_MODEL` | `accounts/fireworks/models/qwen3p7-plus` | Vision model (config-only, never hardcoded; must be serverless) |
 | `FIREWORKS_TRANSCRIPTION_MODEL` | `whisper-v3` | Fireworks-hosted Whisper model |
 | `MOCK_MODE` | `false` | Force canned responses, no API calls |
 | `TASKS_PATH` | `/input/tasks.json` | Task list (submission mode) |

@@ -26,7 +26,7 @@ def load_config():
     return {
         "fireworks_api_key": os.getenv("FIREWORKS_API_KEY", ""),
         "fireworks_caption_model": os.getenv("FIREWORKS_CAPTION_MODEL")
-        or "accounts/fireworks/models/qwen2p5-vl-32b-instruct",
+        or "accounts/fireworks/models/qwen3p7-plus",
         "fireworks_transcription_model": os.getenv("FIREWORKS_TRANSCRIPTION_MODEL")
         or "whisper-v3",
         "mock_mode": os.getenv("MOCK_MODE", "false").lower() == "true",

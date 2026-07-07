@@ -199,7 +199,7 @@ pip install -r requirements.txt
 ```bash
 docker build \
   --build-arg FIREWORKS_API_KEY=your_key \
-  --build-arg FIREWORKS_CAPTION_MODEL=accounts/fireworks/models/qwen2p5-vl-32b-instruct \
+  --build-arg FIREWORKS_CAPTION_MODEL=accounts/fireworks/models/qwen3p7-plus \
   -t fourtakes:latest .
 ```
 
