@@ -42,7 +42,7 @@ MOCK_STYLE_RESPONSES = {
         "frisbee mid-air with 100% uptime, then returns the payload to the "
         "clients on the bench. Ship it."
     ),
-    "humorous_nontech": (
+    "humorous_non_tech": (
         "This good boy just won gold in the Backyard Olympics! One leap, one "
         "catch, and a victory lap back to his adoring fans on the bench. "
         "Ten out of ten, would fetch again."

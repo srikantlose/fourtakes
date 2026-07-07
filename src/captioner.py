@@ -1,22 +1,24 @@
-"""Caption generation: one neutral base caption per video, then four
-style transformations built from that single base caption.
+"""Caption generation: one neutral base caption per video, then style
+transformations built from that single base caption.
 
-The base caption is generated ONCE and reused for all styles so the four
+The base caption is generated ONCE and reused for all styles so the
 outputs stay factually consistent and vision-call costs stay low.
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
 
 from .fireworks_client import FireworksClient, MOCK_STYLE_RESPONSES
 
 logger = logging.getLogger(__name__)
 
-STYLE_KEYS = ["formal", "sarcastic", "humorous_tech", "humorous_nontech"]
+# Exact style keys from the Track 2 submission guide.
+STYLE_KEYS = ["formal", "sarcastic", "humorous_tech", "humorous_non_tech"]
 
 
 class Captioner:
-    """Generates the base caption and the four styled captions.
+    """Generates the base caption and the styled captions.
 
     Args:
         client: Configured FireworksClient (real or mock).
@@ -61,9 +63,25 @@ class Captioner:
         return caption.strip()
 
     def generate_styled_caption(self, style: str, base_caption: str) -> str:
-        """Transform the base caption into one of the four styles."""
-        style_config = self.prompts["styles"][style]
-        prompt = style_config["prompt"].format(description=base_caption)
+        """Transform the base caption into the requested style.
+
+        Styles without a dedicated prompt fall back to the generic_style
+        template so unexpected style names still get a real attempt.
+        """
+        style_config = self.prompts["styles"].get(style)
+        if style_config is not None:
+            prompt = style_config["prompt"].format(description=base_caption)
+        else:
+            generic = self.prompts.get("generic_style")
+            if not generic:
+                raise ValueError(
+                    f"No prompt for style '{style}' and no generic_style template"
+                )
+            logger.warning("Unknown style '%s' — using generic template", style)
+            prompt = generic["prompt"].format(
+                style_name=style.replace("_", " "),
+                description=base_caption,
+            )
         messages = [{"role": "user", "content": prompt}]
 
         logger.info("Generating '%s' caption", style)
@@ -75,17 +93,28 @@ class Captioner:
         )
         return caption.strip()
 
-    def generate_all_styles(self, base_caption: str) -> Dict[str, str]:
-        """Generate all four styled captions from one base caption.
+    def generate_all_styles(
+        self,
+        base_caption: str,
+        styles: Optional[List[str]] = None,
+    ) -> Dict[str, Optional[str]]:
+        """Generate styled captions for the requested styles in parallel.
 
-        A failure in one style records an error string for that style
-        rather than aborting the other three.
+        The style calls are independent text transforms, so running them
+        concurrently cuts per-clip latency to roughly one call's worth.
+
+        A failed style maps to None; the caller decides the fallback
+        (the pipeline substitutes the base caption).
         """
-        results = {}
-        for style in STYLE_KEYS:
+        styles = list(styles) if styles else list(STYLE_KEYS)
+        results: Dict[str, Optional[str]] = {s: None for s in styles}
+
+        def _one(style: str) -> None:
             try:
                 results[style] = self.generate_styled_caption(style, base_caption)
             except Exception as exc:
                 logger.error("Style '%s' failed: %s", style, exc)
-                results[style] = f"[ERROR: caption generation failed: {exc}]"
+
+        with ThreadPoolExecutor(max_workers=min(4, len(styles))) as pool:
+            list(pool.map(_one, styles))
         return results

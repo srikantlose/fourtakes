@@ -12,15 +12,30 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ src/
 COPY config/ config/
-COPY .env.template .
 
-# Model + API key are supplied at runtime via env vars, never baked in:
-#   docker run -e FIREWORKS_API_KEY=... -e FIREWORKS_CAPTION_MODEL=... \
-#     -v /path/to/videos:/videos -v /path/to/output:/app/output \
-#     fourtakes /videos
-ENV OUTPUT_DIR=/app/output \
+# Track 2 judging injects NO environment variables — credentials and model
+# ship inside the image. Supply them at build time:
+#   docker build \
+#     --build-arg FIREWORKS_API_KEY=your_key \
+#     --build-arg FIREWORKS_CAPTION_MODEL=accounts/fireworks/models/... \
+#     -t fourtakes .
+# Empty values fall through to config defaults (empty key => mock mode).
+ARG FIREWORKS_API_KEY=""
+ARG FIREWORKS_CAPTION_MODEL=""
+ENV FIREWORKS_API_KEY=${FIREWORKS_API_KEY} \
+    FIREWORKS_CAPTION_MODEL=${FIREWORKS_CAPTION_MODEL}
+
+# Submission-mode defaults: harness mounts /input and /output.
+# Audio transcription is off in the container to protect the 10-minute
+# runtime budget (re-enable with -e ENABLE_AUDIO_TRANSCRIPTION=true).
+ENV TASKS_PATH=/input/tasks.json \
+    RESULTS_PATH=/output/results.json \
+    ENABLE_AUDIO_TRANSCRIPTION=false \
+    OUTPUT_DIR=/app/output \
     TEMP_DIR=/tmp/fourtakes \
     PROMPTS_PATH=/app/config/prompts.json
 
+# No args => submission mode (reads TASKS_PATH, writes RESULTS_PATH).
+# Pass a video path or flags for local dev usage instead.
 ENTRYPOINT ["python", "-m", "src.main"]
-CMD ["--help"]
+CMD []

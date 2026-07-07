@@ -99,6 +99,44 @@ rm fourtakes.log
 del fourtakes.log
 ```
 
+## Submission (Task) Mode Testing
+
+### Create a local tasks file with the official example clips
+```json
+// save as input/tasks.json
+[
+  {
+    "task_id": "v1",
+    "video_url": "https://storage.googleapis.com/amd-hackathon-clips/1860079-uhd_2560_1440_25fps.mp4",
+    "styles": ["formal", "sarcastic", "humorous_tech", "humorous_non_tech"]
+  },
+  {
+    "task_id": "v2",
+    "video_url": "https://storage.googleapis.com/amd-hackathon-clips/13825391-uhd_3840_2160_30fps.mp4",
+    "styles": ["formal", "sarcastic", "humorous_tech", "humorous_non_tech"]
+  },
+  {
+    "task_id": "v3",
+    "video_url": "https://storage.googleapis.com/amd-hackathon-clips/3044693-uhd_3840_2160_24fps.mp4",
+    "styles": ["formal", "sarcastic", "humorous_tech", "humorous_non_tech"]
+  }
+]
+```
+
+### Run submission mode locally
+```bash
+# Real API (needs FIREWORKS_API_KEY in .env.local; downloads the clips)
+python -m src.main --tasks input/tasks.json --results output/results.json
+
+# Mock mode (still downloads + extracts frames, but no API calls)
+MOCK_MODE=true python -m src.main --tasks input/tasks.json --results output/results.json
+```
+
+### Inspect the results
+```bash
+python -m json.tool output/results.json
+```
+
 ## Frame Extraction Testing
 
 ### Extract frames from a video (Python script)
@@ -155,25 +193,44 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-## Docker (Phase 5+)
+## Docker
 
-### Build Docker image
+### Build (submission image: key + model baked in, judging injects nothing)
 ```bash
-docker build -t fourtakes:latest .
+docker build \
+  --build-arg FIREWORKS_API_KEY=your_key \
+  --build-arg FIREWORKS_CAPTION_MODEL=accounts/fireworks/models/qwen2p5-vl-32b-instruct \
+  -t fourtakes:latest .
 ```
 
-### Run Docker container
+### Simulate the judging harness
 ```bash
-# Extract frames from video
-docker run -v /path/to/videos:/videos fourtakes:latest /videos/sample.mp4
+docker run \
+  -v "$(pwd)/input:/input" \
+  -v "$(pwd)/output:/output" \
+  fourtakes:latest
+```
 
-# With custom config
-docker run -e FRAME_INTERVAL_SECONDS=2.0 -v /path/to/videos:/videos fourtakes:latest /videos/sample.mp4
+### Mock-mode smoke test (build without a key => mock mode)
+```bash
+docker build -t fourtakes-mock .
+docker run -v "$(pwd)/input:/input" -v "$(pwd)/output:/output" fourtakes-mock
+```
+
+### Local dev run against a mounted video
+```bash
+docker run -v /path/to/videos:/videos fourtakes:latest /videos/sample.mp4
 ```
 
 ### Debug Docker image
 ```bash
-docker run -it fourtakes:latest /bin/bash
+docker run -it --entrypoint /bin/bash fourtakes:latest
+```
+
+### Push for submission (public registry, linux/amd64)
+```bash
+docker tag fourtakes:latest <registry>/<user>/fourtakes:latest
+docker push <registry>/<user>/fourtakes:latest
 ```
 
 ## Debugging Tips

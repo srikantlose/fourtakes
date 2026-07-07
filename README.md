@@ -1,29 +1,65 @@
-# FourTakes: Video Captioning Pipeline
+# FourTakes: Video Captioning Agent
 
-Generate four distinctly-voiced captions — **Formal**, **Sarcastic**, **Humorous-Tech**, and **Humorous-Non-Tech** — for short video clips (30 sec–2 min) using vision models via the Fireworks AI API.
+Generates captions in four distinct voices — **formal**, **sarcastic**, **humorous_tech**, and **humorous_non_tech** — for short video clips (30 sec–2 min), using vision models via the Fireworks AI API.
 
 Built for AMD Developer Hackathon: ACT II, Track 2 (Video Captioning).
 
 ## How It Works
 
 ```
-video clip
-  → extract frames with ffmpeg (every 1.5s, configurable)
+video (URL or local file)
+  → download (submission mode) or read local file
+  → extract frames with ffmpeg (every 1.5s, downscaled to ≤512px wide)
   → downsample to MAX_FRAMES (evenly, keeping first + last frame)
-  → extract audio + transcribe via Fireworks-hosted Whisper (optional, best-effort)
+  → optional: extract audio + transcribe via Fireworks-hosted Whisper
   → ONE vision-model call: neutral factual base caption
-  → FOUR text-model calls: transform base caption into each style
-  → JSON result per video + combined results file
+  → parallel text-model calls: transform base caption into each requested style
+  → results JSON
 ```
 
-The base caption is generated **once** per video and reused for all four styles, so the outputs stay factually consistent and vision-call costs stay low.
+The base caption is generated **once** per video and reused for all styles, so the outputs stay factually consistent and vision-call costs stay low.
+
+## Submission Mode (the judged path)
+
+The container follows the Track 2 harness contract:
+
+1. Reads `/input/tasks.json`:
+```json
+[
+  {
+    "task_id": "v1",
+    "video_url": "https://storage.example.com/clips/clip1.mp4",
+    "styles": ["formal", "sarcastic", "humorous_tech", "humorous_non_tech"]
+  }
+]
+```
+2. Writes `/output/results.json` before exiting (exit code 0):
+```json
+[
+  {
+    "task_id": "v1",
+    "captions": {
+      "formal": "...",
+      "sarcastic": "...",
+      "humorous_tech": "...",
+      "humorous_non_tech": "..."
+    }
+  }
+]
+```
+
+Robustness guarantees:
+- **Every requested style always gets a caption.** A failed style call falls back to the base caption; a fully failed video falls back to a generic caption. Missing styles score zero, so nothing is ever left out.
+- **One bad clip never breaks the batch** — tasks are isolated and run concurrently (`MAX_CONCURRENT_TASKS`) to stay inside the 10-minute runtime limit.
+- **Unknown style names still work** via a generic style-prompt template.
+- `results.json` is always valid JSON, written atomically.
 
 ## Key Design Rules
 
-- **No hardcoded model names.** The caption model comes from `FIREWORKS_CAPTION_MODEL` (env var or `--model` flag). Launch-day model swaps are a config change, not a code change.
+- **No hardcoded model names.** The caption model comes from `FIREWORKS_CAPTION_MODEL` (env var, build arg, or `--model` flag). Swapping models is a config change, not a code change.
 - **Mock mode** (`MOCK_MODE=true` or `--mock`): the entire pipeline runs with canned API responses — no key, no credits, no network. Used for development and CI.
-- **Best-effort audio**: transcription failures never break captioning; the pipeline continues on frames alone.
-- **Batch-safe**: one broken video in a directory never aborts the others; its error is recorded in its own result entry.
+- **UHD-safe**: frames are downscaled to `FRAME_SCALE_WIDTH` (512px) before encoding, and at most `MAX_FRAMES` (16) are sent per video.
+- **Best-effort audio**: transcription failures never break captioning (audio is off by default in the container to protect the time budget).
 - **Every API call is logged** with model name, tokens, latency, and status.
 
 ## Project Structure
@@ -32,16 +68,17 @@ The base caption is generated **once** per video and reused for all four styles,
 fourtakes/
 ├── src/
 │   ├── config.py            # env-based config + prompts loader
-│   ├── frame_extractor.py   # ffmpeg frame/audio extraction
+│   ├── frame_extractor.py   # ffmpeg frame/audio extraction (with downscale)
 │   ├── fireworks_client.py  # Fireworks API wrapper (retries, logging, mock mode)
 │   ├── transcriber.py       # Fireworks-hosted Whisper transcription
-│   ├── captioner.py         # base caption + 4 style transforms
-│   ├── pipeline.py          # end-to-end orchestrator + JSON output
+│   ├── captioner.py         # base caption + parallel style transforms
+│   ├── pipeline.py          # per-video orchestrator + style fallbacks
+│   ├── task_runner.py       # submission mode: tasks.json → results.json
 │   ├── logging_config.py    # file + console logging
-│   └── main.py              # CLI entrypoint
+│   └── main.py              # CLI entrypoint (submission + dev modes)
 ├── config/
-│   └── prompts.json         # ALL prompts (base + 4 styles) — edit here to iterate
-├── tests/                   # unit + integration tests (no API key or ffmpeg needed)
+│   └── prompts.json         # ALL prompts (base + styles + generic) — edit here
+├── tests/                   # 34 tests, all runnable offline
 ├── Dockerfile
 ├── .env.template            # copy to .env.local and fill in
 └── requirements.txt
@@ -64,59 +101,44 @@ copy .env.template .env.local   # then edit: set FIREWORKS_API_KEY
 ## Usage
 
 ```bash
-# Single video
-python -m src.main path/to/clip.mp4
+# Submission mode against a local tasks file
+python -m src.main --tasks input/tasks.json --results output/results.json
 
-# Directory of videos
+# Local dev: single video or directory
+python -m src.main path/to/clip.mp4
 python -m src.main path/to/videos/ --output-dir results
 
-# No API key yet? Run in mock mode (full pipeline, canned captions)
+# No API key yet? Mock mode runs the full pipeline with canned captions
 python -m src.main path/to/clip.mp4 --mock
 
-# Override the model for one run (e.g., launch day)
-python -m src.main clip.mp4 --model accounts/fireworks/models/launch-day-model
-
-# Skip audio transcription
-python -m src.main clip.mp4 --no-audio
+# Override the model for one run
+python -m src.main clip.mp4 --model accounts/fireworks/models/some-model
 ```
-
-Output per video (`output/<video_id>.json`):
-
-```json
-{
-  "video_id": "clip",
-  "status": "ok",
-  "base_caption": "...neutral factual description...",
-  "captions": {
-    "formal": "...",
-    "sarcastic": "...",
-    "humorous_tech": "...",
-    "humorous_nontech": "..."
-  },
-  "metadata": {
-    "model_used": "...", "frames_extracted": 23, "frames_sent_to_model": 16,
-    "audio_transcribed": true, "duration_seconds": 35.0, "...": "..."
-  }
-}
-```
-
-`output/all_results.json` additionally includes an `api_usage` summary (total calls, tokens, errors).
 
 ## Docker
 
+Track 2 injects **no** environment variables at judging time, so credentials and the model ID are supplied at build time:
+
 ```bash
-docker build -t fourtakes .
+docker build \
+  --build-arg FIREWORKS_API_KEY=your_key \
+  --build-arg FIREWORKS_CAPTION_MODEL=accounts/fireworks/models/qwen2p5-vl-32b-instruct \
+  -t fourtakes .
 
+# Simulate the judging harness locally:
 docker run \
-  -e FIREWORKS_API_KEY=your_key \
-  -e FIREWORKS_CAPTION_MODEL=accounts/fireworks/models/whatever-is-revealed \
-  -v /path/to/videos:/videos \
-  -v /path/to/output:/app/output \
-  fourtakes /videos
+  -v /path/to/input:/input \
+  -v /path/to/output:/output \
+  fourtakes
 
-# Mock-mode smoke test (no key needed):
-docker run -v /path/to/videos:/videos -v /path/to/output:/app/output fourtakes /videos --mock
+# Mock-mode smoke test (no key baked in => mock mode automatically):
+docker build -t fourtakes-mock .
+docker run -v /path/to/input:/input -v /path/to/output:/output fourtakes-mock
 ```
+
+The judging VM runs `linux/amd64`; standard builds on Intel/AMD machines produce that by default. On Apple Silicon add `--platform linux/amd64`.
+
+> Note: an image with a baked-in API key is public once pushed. Push shortly before submitting, keep only the credits you need on the key, and revoke it after the event.
 
 ## Tests
 
@@ -124,26 +146,31 @@ docker run -v /path/to/videos:/videos -v /path/to/output:/app/output fourtakes /
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-22 tests, all runnable offline — no API key, credits, or ffmpeg required (extraction and API calls are mocked).
+34 tests, all runnable offline — no API key, credits, or ffmpeg required (extraction, downloads, and API calls are mocked).
 
 ## Configuration Reference
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `FIREWORKS_API_KEY` | (empty → mock mode) | Fireworks API key |
-| `FIREWORKS_CAPTION_MODEL` | `accounts/fireworks/models/phi-4-vision-128k` | Vision model — swap on launch day |
+| `FIREWORKS_CAPTION_MODEL` | `accounts/fireworks/models/qwen2p5-vl-32b-instruct` | Vision model (config-only, never hardcoded) |
 | `FIREWORKS_TRANSCRIPTION_MODEL` | `whisper-v3` | Fireworks-hosted Whisper model |
 | `MOCK_MODE` | `false` | Force canned responses, no API calls |
+| `TASKS_PATH` | `/input/tasks.json` | Task list (submission mode) |
+| `RESULTS_PATH` | `/output/results.json` | Results file (submission mode) |
+| `MAX_CONCURRENT_TASKS` | `3` | Videos processed in parallel |
 | `FRAME_INTERVAL_SECONDS` | `1.5` | Seconds between extracted frames |
 | `MAX_FRAMES` | `16` | Cap on frames sent to the model (evenly sampled) |
-| `ENABLE_AUDIO_TRANSCRIPTION` | `true` | Transcribe audio for extra caption context |
+| `FRAME_SCALE_WIDTH` | `512` | Downscale frames wider than this (0 = off) |
+| `ENABLE_AUDIO_TRANSCRIPTION` | `true` (`false` in Docker) | Transcribe audio for extra context |
+| `DOWNLOAD_TIMEOUT` / `API_TIMEOUT` | `120` / `60` | Timeouts in seconds |
 | `PROMPTS_PATH` | `config/prompts.json` | Prompt definitions file |
 | `LOG_LEVEL` / `LOG_FILE` | `INFO` / `fourtakes.log` | Logging |
-| `OUTPUT_DIR` / `TEMP_DIR` | `output` / `.temp` | Directories |
+| `OUTPUT_DIR` / `TEMP_DIR` | `output` / `.temp` | Directories (dev mode) |
 
 ## Editing the Caption Styles
 
-All five prompts (base + four styles) live in [config/prompts.json](config/prompts.json). Edit that file to iterate on caption voice — no code changes needed.
+All prompts (base caption, the four styles, and the generic fallback template) live in [config/prompts.json](config/prompts.json). Edit that file to iterate on caption voice — no code changes needed.
 
 ## License
 

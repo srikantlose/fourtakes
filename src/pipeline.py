@@ -48,6 +48,7 @@ class FourTakesPipeline:
             api_key=config["fireworks_api_key"],
             model=config["fireworks_caption_model"],
             mock_mode=config["mock_mode"],
+            timeout=config.get("api_timeout", 60),
         )
         self.transcriber = Transcriber(
             api_key=config["fireworks_api_key"],
@@ -56,11 +57,17 @@ class FourTakesPipeline:
         )
         self.captioner = Captioner(self.client, prompts)
         self.extractor = FrameExtractor(
-            frame_interval=config["frame_interval_seconds"]
+            frame_interval=config["frame_interval_seconds"],
+            frame_scale_width=config.get("frame_scale_width", 512),
         )
 
-    def process_video(self, video_path: str) -> dict:
-        """Run the full pipeline on a single video. Never raises."""
+    def process_video(self, video_path: str, styles: Optional[List[str]] = None) -> dict:
+        """Run the full pipeline on a single video. Never raises.
+
+        Args:
+            video_path: Local path to the video file.
+            styles: Style keys to generate; defaults to all four.
+        """
         video_path = str(video_path)
         video_id = Path(video_path).stem
         started = time.time()
@@ -108,10 +115,17 @@ class FourTakesPipeline:
             )
             result["base_caption"] = base_caption
 
-            # 4. Four styled captions
-            result["captions"] = self.captioner.generate_all_styles(base_caption)
+            # 4. Styled captions (all four unless the task requests a subset).
+            # A failed style falls back to the base caption: every requested
+            # style must always have a usable caption (missing = scores zero).
+            captions = self.captioner.generate_all_styles(base_caption, styles=styles)
+            fallback_styles = [s for s, text in captions.items() if not text]
+            for style in fallback_styles:
+                captions[style] = base_caption
+            result["captions"] = captions
 
             result["metadata"] = {
+                "style_fallbacks": fallback_styles,
                 "model_used": self.config["fireworks_caption_model"],
                 "mock_mode": self.client.mock_mode,
                 "duration_seconds": frame_meta.get("duration_seconds"),

@@ -11,14 +11,18 @@ logger = logging.getLogger(__name__)
 class FrameExtractor:
     """Extract frames from video files using ffmpeg."""
 
-    def __init__(self, frame_interval: float = 1.5):
+    def __init__(self, frame_interval: float = 1.5, frame_scale_width: int = 512):
         """
         Initialize frame extractor.
 
         Args:
             frame_interval: Seconds between extracted frames
+            frame_scale_width: Max frame width in pixels; UHD sources are
+                downscaled to this (never upscaled) to keep vision-model
+                payloads small. 0 disables scaling.
         """
         self.frame_interval = frame_interval
+        self.frame_scale_width = frame_scale_width
 
     def get_video_duration(self, video_path: str) -> float:
         """Get video duration in seconds using ffprobe."""
@@ -83,10 +87,15 @@ class FrameExtractor:
         frame_pattern = str(Path(output_dir) / "frame_%04d.jpg")
         fps = 1.0 / self.frame_interval
 
+        vf = f"fps={fps}"
+        if self.frame_scale_width:
+            # min(w,iw) avoids upscaling; -2 keeps height even for encoders
+            vf += f",scale='min({self.frame_scale_width},iw)':-2"
+
         cmd = [
             "ffmpeg",
             "-i", video_path,
-            "-vf", f"fps={fps}",
+            "-vf", vf,
             "-q:v", "2",
             frame_pattern
         ]

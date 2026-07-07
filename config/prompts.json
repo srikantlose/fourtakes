@@ -3,6 +3,10 @@
     "description": "Generates the neutral factual description all four styles build from",
     "prompt": "You are given a sequence of frames sampled from a short video clip, in chronological order. Describe what happens in the clip in clear, neutral, factual language.\n\nCover:\n- Who or what is present (people, animals, objects)\n- What actions occur and in what order\n- The setting or environment\n- Any visible on-screen text or graphics\n\nWrite 2-4 sentences. Describe the clip as a whole, not frame by frame. Do not add interpretation, opinions, emotion, or speculation about things not visible."
   },
+  "generic_style": {
+    "description": "Fallback template for any requested style that has no dedicated prompt above",
+    "prompt": "Rewrite the following video description as a caption in a '{style_name}' style and tone. Stay faithful to the described content - do not invent things that are not in the description. Write 1-3 sentences.\n\nReturn ONLY the caption text, nothing else.\n\nVideo description:\n{description}"
+  },
   "styles": {
     "formal": {
       "label": "Formal",
@@ -16,7 +20,7 @@
       "label": "Humorous (Tech)",
       "prompt": "Rewrite the following video description as a funny caption written BY a software engineer FOR other engineers.\n\nVoice rules:\n- Frame what happens in the clip using programming and tech metaphors: bugs, deploys, merge conflicts, race conditions, uptime, CPU/GPU, APIs, machine learning, code review\n- The humor is affectionate insider humor - the fun comes from mapping everyday events onto tech concepts accurately\n- Pick ONE or TWO tech metaphors that genuinely fit the action; do not pile on jargon\n- Upbeat, not sarcastic - this voice is enthusiastic, not eye-rolling\n- 1-3 sentences\n\nReturn ONLY the caption text, nothing else.\n\nVideo description:\n{description}"
     },
-    "humorous_nontech": {
+    "humorous_non_tech": {
       "label": "Humorous (Non-Tech)",
       "prompt": "Rewrite the following video description as a funny caption for a general audience - something that would work as a viral social media caption anyone's grandmother would also laugh at.\n\nVoice rules:\n- Everyday humor: wordplay, puns, playful exaggeration, sports-commentary energy, or giving subjects funny motivations and inner monologues\n- Absolutely NO technology references, programming terms, or internet-insider jargon\n- Warm and playful, never mocking\n- 1-3 sentences\n\nReturn ONLY the caption text, nothing else.\n\nVideo description:\n{description}"
     }

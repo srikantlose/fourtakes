@@ -28,7 +28,13 @@ def make_test_config(**overrides) -> dict:
         "mock_mode": True,
         "frame_interval_seconds": 1.5,
         "max_frames": 16,
+        "frame_scale_width": 512,
         "enable_audio_transcription": True,
+        "tasks_path": "/input/tasks.json",
+        "results_path": "/output/results.json",
+        "max_concurrent_tasks": 3,
+        "download_timeout": 120,
+        "api_timeout": 60,
         "prompts_path": str(PROJECT_ROOT / "config" / "prompts.json"),
         "log_level": "WARNING",
         "log_file": "test.log",
@@ -101,6 +107,27 @@ class TestCaptioner(unittest.TestCase):
         with self.assertRaises(ValueError):
             Captioner(self.client, broken)
 
+    def test_requested_subset_of_styles(self):
+        captions = self.captioner.generate_all_styles(
+            MOCK_BASE_CAPTION, styles=["formal", "sarcastic"]
+        )
+        self.assertEqual(set(captions.keys()), {"formal", "sarcastic"})
+
+    def test_unknown_style_uses_generic_template(self):
+        captions = self.captioner.generate_all_styles(
+            MOCK_BASE_CAPTION, styles=["formal", "dramatic"]
+        )
+        self.assertEqual(set(captions.keys()), {"formal", "dramatic"})
+        self.assertTrue(captions["dramatic"])
+
+    def test_failed_style_maps_to_none(self):
+        with patch.object(
+            self.captioner, "generate_styled_caption",
+            side_effect=RuntimeError("api down"),
+        ):
+            captions = self.captioner.generate_all_styles(MOCK_BASE_CAPTION)
+        self.assertTrue(all(v is None for v in captions.values()))
+
 
 class TestPipelineEndToEnd(unittest.TestCase):
     """Full pipeline run with extraction patched out and mock API."""
@@ -163,6 +190,32 @@ class TestPipelineEndToEnd(unittest.TestCase):
             with open(written[1], encoding="utf-8") as f:
                 combined = json.load(f)
             self.assertIn("api_usage", combined)
+
+    def test_failed_style_falls_back_to_base_caption(self):
+        config = make_test_config()
+        prompts = load_prompts()
+        pipeline = FourTakesPipeline(config, prompts)
+
+        original = pipeline.captioner.generate_styled_caption
+
+        def flaky(style, base_caption):
+            if style == "sarcastic":
+                raise RuntimeError("style call died")
+            return original(style, base_caption)
+
+        fake_frames = [f"frame_{i:04d}.jpg" for i in range(10)]
+        with patch.object(
+            pipeline.extractor, "extract_frames",
+            return_value=(fake_frames, {"duration_seconds": 15.0}),
+        ), patch.object(
+            pipeline.captioner, "generate_styled_caption", side_effect=flaky
+        ):
+            config["enable_audio_transcription"] = False
+            result = pipeline.process_video("fake.mp4")
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["captions"]["sarcastic"], result["base_caption"])
+        self.assertEqual(result["metadata"]["style_fallbacks"], ["sarcastic"])
 
     def test_extraction_failure_is_contained(self):
         config = make_test_config()
