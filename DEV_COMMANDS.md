@@ -237,9 +237,10 @@ docker run -it --entrypoint /bin/bash fourtakes:latest
 
 ### Push for submission (public registry, linux/amd64)
 ```bash
-docker tag fourtakes:latest <registry>/<user>/fourtakes:latest
-docker push <registry>/<user>/fourtakes:latest
+docker build -t srikantlose/fourtakes:latest .
+docker push srikantlose/fourtakes:latest
 ```
+Published: https://hub.docker.com/r/srikantlose/fourtakes
 
 ## Debugging Tips
 

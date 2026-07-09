@@ -143,7 +143,7 @@ The judging VM runs `linux/amd64`; standard builds on Intel/AMD machines produce
 Track 2 deliverables, all linked from this repository:
 
 - **Code:** this repo — https://github.com/srikantlose/fourtakes
-- **Docker image:** _TODO — registry link once pushed_
+- **Docker image:** https://hub.docker.com/r/srikantlose/fourtakes — `docker pull srikantlose/fourtakes:latest`
 - **Demo video:** _TODO_
 - **Slide deck:** _TODO_
 
