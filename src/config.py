@@ -21,7 +21,11 @@ def load_config():
         env_path = PROJECT_ROOT / ".env"
 
     if env_path.exists():
-        load_dotenv(env_path)
+        # override=True so .env.local always wins over a stale exported
+        # shell var during local dev. Harmless in the judging container:
+        # .env.local is gitignored and never copied into the image, so
+        # the harness's injected env vars are the only source there.
+        load_dotenv(env_path, override=True)
 
     return {
         "fireworks_api_key": os.getenv("FIREWORKS_API_KEY", ""),

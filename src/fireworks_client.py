@@ -153,6 +153,11 @@ class FireworksClient:
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
+            # Reasoning models (e.g. qwen3p7-plus) otherwise spend the
+            # entire token budget on visible chain-of-thought and return
+            # that instead of an answer. Confirmed harmless on non-reasoning
+            # models (tested against glm-5p1) — Fireworks tolerates it.
+            "reasoning_effort": "none",
         }
         headers = {
             "Authorization": f"Bearer {self.api_key}",

@@ -138,6 +138,25 @@ class TestBaseUrl(unittest.TestCase):
             "http://judge.proxy:8000/v1/chat/completions",
         )
 
+    def test_client_disables_reasoning_effort(self):
+        # Reasoning models otherwise burn the token budget on visible
+        # chain-of-thought instead of returning a caption.
+        client = FireworksClient(
+            api_key="fake-key", model="m", base_url="http://judge.proxy/v1"
+        )
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "choices": [{"message": {"content": "a caption"}}],
+            "usage": {"total_tokens": 10},
+        }
+        with patch(
+            "src.fireworks_client.requests.post", return_value=response
+        ) as mock_post:
+            client.chat_completion([{"role": "user", "content": "hi"}])
+        self.assertEqual(
+            mock_post.call_args.kwargs["json"]["reasoning_effort"], "none"
+        )
+
     def test_client_strips_trailing_slash(self):
         client = FireworksClient(
             api_key="fake-key", model="m", base_url="http://judge.proxy/v1/"
@@ -168,6 +187,24 @@ class TestBaseUrl(unittest.TestCase):
             pipeline.transcriber.transcription_url,
             "http://judge.proxy:8000/v1/audio/transcriptions",
         )
+
+
+class TestDotenvPrecedence(unittest.TestCase):
+    """A stale shell-exported FIREWORKS_API_KEY (left over from an earlier
+    session/key) must not shadow a fresher value in .env.local — this bit
+    us for real during manual testing."""
+
+    def test_env_local_overrides_stale_shell_var(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_root = Path(tmpdir)
+            (tmp_root / ".env.local").write_text(
+                "FIREWORKS_API_KEY=fresh-key\n"
+            )
+            with patch("src.config.PROJECT_ROOT", tmp_root), patch.dict(
+                os.environ, {"FIREWORKS_API_KEY": "stale-key"}
+            ):
+                config = load_config()
+        self.assertEqual(config["fireworks_api_key"], "fresh-key")
 
 
 class TestCaptioner(unittest.TestCase):
