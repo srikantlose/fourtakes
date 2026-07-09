@@ -189,6 +189,45 @@ class TestBaseUrl(unittest.TestCase):
         )
 
 
+class TestTranscriberDeprecatedEndpoint(unittest.TestCase):
+    """Fireworks deprecated hosted audio inference platform-wide, so
+    /audio/transcriptions now returns 401 for every key. transcribe()
+    must degrade to None without raising, so the dead endpoint can never
+    break the caption pipeline — and the config default must reflect
+    that there's no point retrying a call that can't succeed."""
+
+    def test_401_returns_none_without_raising(self):
+        transcriber = Transcriber(
+            api_key="fake-key", base_url="http://judge.proxy/v1"
+        )
+        response = MagicMock(status_code=401)
+        response.text = (
+            '{"error":{"object":"error","type":"unauthorized",'
+            '"message":"Unauthorized"}}'
+        )
+        # delete=False + manual cleanup: an open NamedTemporaryFile can't be
+        # reopened by transcribe() on Windows (exclusive lock).
+        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        tmp.close()
+        try:
+            with patch(
+                "src.transcriber.requests.post", return_value=response
+            ) as mock_post, patch("src.transcriber.time.sleep"):
+                result = transcriber.transcribe(tmp.name)
+        finally:
+            os.unlink(tmp.name)
+        self.assertIsNone(result)
+        # 401 isn't in the retryable status set, so it should fail fast
+        # instead of burning the full retry budget on a permanent error.
+        self.assertEqual(mock_post.call_count, 1)
+
+    def test_enable_audio_transcription_defaults_to_false(self):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("ENABLE_AUDIO_TRANSCRIPTION", None)
+            config = load_config()
+        self.assertFalse(config["enable_audio_transcription"])
+
+
 class TestDotenvPrecedence(unittest.TestCase):
     """A stale shell-exported FIREWORKS_API_KEY (left over from an earlier
     session/key) must not shadow a fresher value in .env.local — this bit

@@ -46,8 +46,14 @@ def load_config():
         ),
         "max_frames": int(os.getenv("MAX_FRAMES", "16")),
         "frame_scale_width": int(os.getenv("FRAME_SCALE_WIDTH", "512")),
+        # Default off: Fireworks deprecated hosted audio inference
+        # (docs.fireworks.ai/updates/changelog, "Audio inference and image
+        # generation are deprecated") — /audio/transcriptions now returns
+        # 401 for every key, so leaving this on just burns retries and time
+        # for a call that can never succeed. Transcription stays best-effort
+        # (see transcriber.py) in case Fireworks reinstates it.
         "enable_audio_transcription": os.getenv(
-            "ENABLE_AUDIO_TRANSCRIPTION", "true"
+            "ENABLE_AUDIO_TRANSCRIPTION", "false"
         ).lower() == "true",
         # Submission (task) mode: the judging harness mounts these paths.
         "tasks_path": os.getenv("TASKS_PATH", "/input/tasks.json"),

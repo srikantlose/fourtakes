@@ -5,7 +5,11 @@ OpenAI account is needed. The transcription model is configurable via
 FIREWORKS_TRANSCRIPTION_MODEL (default: whisper-v3).
 
 Transcription is best-effort: any failure returns None so the caption
-pipeline continues on frames alone rather than crashing.
+pipeline continues on frames alone rather than crashing. As of this
+writing, Fireworks has deprecated hosted audio inference platform-wide,
+so every call here returns HTTP 401 regardless of the key — that's why
+ENABLE_AUDIO_TRANSCRIPTION defaults to false. Kept in place in case the
+endpoint comes back.
 """
 
 import logging

@@ -34,8 +34,9 @@ ENV FIREWORKS_API_KEY=${FIREWORKS_API_KEY} \
     FIREWORKS_CAPTION_MODEL=${FIREWORKS_CAPTION_MODEL}
 
 # Submission-mode defaults: harness mounts /input and /output.
-# Audio transcription is off in the container to protect the 10-minute
-# runtime budget (re-enable with -e ENABLE_AUDIO_TRANSCRIPTION=true).
+# Audio transcription is off: Fireworks has deprecated hosted audio
+# inference platform-wide, so /audio/transcriptions returns 401 for
+# every key right now, regardless of this flag.
 ENV TASKS_PATH=/input/tasks.json \
     RESULTS_PATH=/output/results.json \
     ENABLE_AUDIO_TRANSCRIPTION=false \

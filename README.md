@@ -12,6 +12,7 @@ video (URL or local file)
   → extract frames with ffmpeg (every 1.5s, downscaled to ≤512px wide)
   → downsample to MAX_FRAMES (evenly, keeping first + last frame)
   → optional: extract audio + transcribe via Fireworks-hosted Whisper
+    (off by default — see note below)
   → ONE vision-model call: neutral factual base caption
   → parallel text-model calls: transform base caption into each requested style
   → results JSON
@@ -59,7 +60,7 @@ Robustness guarantees:
 - **No hardcoded model names.** The caption model comes from `FIREWORKS_CAPTION_MODEL` (env var, build arg, or `--model` flag). Swapping models is a config change, not a code change.
 - **Mock mode** (`MOCK_MODE=true` or `--mock`): the entire pipeline runs with canned API responses — no key, no credits, no network. Used for development and CI.
 - **UHD-safe**: frames are downscaled to `FRAME_SCALE_WIDTH` (512px) before encoding, and at most `MAX_FRAMES` (16) are sent per video.
-- **Best-effort audio**: transcription failures never break captioning (audio is off by default in the container to protect the time budget).
+- **Best-effort audio**: transcription failures never break captioning. Off by default everywhere — Fireworks has deprecated hosted audio inference platform-wide, so `/audio/transcriptions` currently returns 401 for every key. The code path is kept in case Fireworks reinstates it.
 - **Every API call is logged** with model name, tokens, latency, and status.
 
 ## Project Structure
@@ -78,7 +79,7 @@ fourtakes/
 │   └── main.py              # CLI entrypoint (submission + dev modes)
 ├── config/
 │   └── prompts.json         # ALL prompts (base + styles + generic) — edit here
-├── tests/                   # 40 tests, all runnable offline
+├── tests/                   # 44 tests, all runnable offline
 ├── Dockerfile
 ├── .env.template            # copy to .env.local and fill in
 └── requirements.txt
@@ -153,7 +154,7 @@ Track 2 deliverables, all linked from this repository:
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-40 tests, all runnable offline — no API key, credits, or ffmpeg required (extraction, downloads, and API calls are mocked).
+44 tests, all runnable offline — no API key, credits, or ffmpeg required (extraction, downloads, and API calls are mocked).
 
 ## Configuration Reference
 
@@ -170,7 +171,7 @@ python -m unittest discover -s tests -p "test_*.py" -v
 | `FRAME_INTERVAL_SECONDS` | `1.5` | Seconds between extracted frames |
 | `MAX_FRAMES` | `16` | Cap on frames sent to the model (evenly sampled) |
 | `FRAME_SCALE_WIDTH` | `512` | Downscale frames wider than this (0 = off) |
-| `ENABLE_AUDIO_TRANSCRIPTION` | `true` (`false` in Docker) | Transcribe audio for extra context |
+| `ENABLE_AUDIO_TRANSCRIPTION` | `false` | Transcribe audio for extra context (Fireworks has deprecated this endpoint — see below) |
 | `DOWNLOAD_TIMEOUT` / `API_TIMEOUT` | `120` / `60` | Timeouts in seconds |
 | `PROMPTS_PATH` | `config/prompts.json` | Prompt definitions file |
 | `LOG_LEVEL` / `LOG_FILE` | `INFO` / `fourtakes.log` | Logging |
