@@ -177,29 +177,49 @@ class FireworksClient:
                 latency = time.time() - start
 
                 if response.status_code == 200:
-                    data = response.json()
-                    text = data["choices"][0]["message"]["content"]
-                    usage = data.get("usage", {})
+                    text = None
+                    try:
+                        data = response.json()
+                        text = data["choices"][0]["message"]["content"]
+                    except (ValueError, KeyError, IndexError, TypeError) as exc:
+                        last_error = f"Malformed 200 response body: {exc}"
+                    else:
+                        if not (isinstance(text, str) and text.strip()):
+                            # Reasoning models can 200 with null/empty
+                            # content; a caption we can't use is a failed
+                            # call, so retry rather than propagate it.
+                            text = None
+                            last_error = "HTTP 200 with empty completion content"
+
+                    if text is not None:
+                        usage = data.get("usage", {})
+                        self._log_call(
+                            status="success",
+                            latency=latency,
+                            attempt=attempt,
+                            prompt_tokens=usage.get("prompt_tokens"),
+                            completion_tokens=usage.get("completion_tokens"),
+                            total_tokens=usage.get("total_tokens"),
+                        )
+                        return text
+
                     self._log_call(
-                        status="success",
+                        status="empty_response",
                         latency=latency,
                         attempt=attempt,
-                        prompt_tokens=usage.get("prompt_tokens"),
-                        completion_tokens=usage.get("completion_tokens"),
-                        total_tokens=usage.get("total_tokens"),
+                        error=last_error,
                     )
-                    return text
-
-                # Retry on rate limits and server errors; fail fast otherwise
-                last_error = f"HTTP {response.status_code}: {response.text[:500]}"
-                self._log_call(
-                    status="http_error",
-                    latency=latency,
-                    attempt=attempt,
-                    error=last_error,
-                )
-                if response.status_code not in (429, 500, 502, 503, 504):
-                    break
+                else:
+                    # Retry on rate limits and server errors; fail fast otherwise
+                    last_error = f"HTTP {response.status_code}: {response.text[:500]}"
+                    self._log_call(
+                        status="http_error",
+                        latency=latency,
+                        attempt=attempt,
+                        error=last_error,
+                    )
+                    if response.status_code not in (429, 500, 502, 503, 504):
+                        break
 
             except requests.RequestException as exc:
                 latency = time.time() - start

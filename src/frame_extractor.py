@@ -31,7 +31,7 @@ class FrameExtractor:
                 "ffprobe",
                 "-v", "error",
                 "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1:nokey=1",
+                "-of", "default=noprint_wrappers=1:nokey=1",
                 video_path
             ]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -92,8 +92,13 @@ class FrameExtractor:
             # min(w,iw) avoids upscaling; -2 keeps height even for encoders
             vf += f",scale='min({self.frame_scale_width},iw)':-2"
 
+        # -nostdin: never wait on stdin (a stray interactive prompt would
+        # burn the runtime budget); -y: overwrite leftovers from a prior
+        # crashed run instead of aborting.
         cmd = [
             "ffmpeg",
+            "-nostdin",
+            "-y",
             "-i", video_path,
             "-vf", vf,
             "-q:v", "2",
@@ -155,6 +160,7 @@ class FrameExtractor:
 
         cmd = [
             "ffmpeg",
+            "-nostdin",
             "-i", video_path,
             "-q:a", "9",
             "-n",
@@ -168,7 +174,9 @@ class FrameExtractor:
                 text=True,
                 timeout=300
             )
-            if result.returncode != 0 and "File already exists" not in result.stderr:
+            # ffmpeg -n reports "File '...' already exists. Exiting." with a
+            # nonzero code; an existing extraction is fine, reuse it.
+            if result.returncode != 0 and "already exists" not in result.stderr:
                 raise RuntimeError(f"ffmpeg error: {result.stderr}")
         except subprocess.TimeoutExpired:
             raise RuntimeError(f"Audio extraction timed out for {video_path}")

@@ -1,7 +1,7 @@
 {
   "base_caption": {
     "description": "Generates the neutral factual description all four styles build from",
-    "prompt": "You are given a sequence of frames sampled from a short video clip, in chronological order. Describe what happens in the clip in clear, neutral, factual language.\n\nCover:\n- Who or what is present (people, animals, objects)\n- What actions occur and in what order\n- The setting or environment\n- Any visible on-screen text or graphics\n\nWrite 2-4 sentences. Describe the clip as a whole, not frame by frame. Do not add interpretation, opinions, emotion, or speculation about things not visible."
+    "prompt": "You are given a sequence of frames sampled from a short video clip, in chronological order. Describe what happens in the clip in clear, neutral, factual language.\n\nCover:\n- Who or what is present (people, animals, objects)\n- What actions occur and in what order\n- The setting or environment\n- Any visible on-screen text or graphics\n\nWrite 2-4 sentences, in English. Describe the clip as a whole, not frame by frame. Do not add interpretation, opinions, emotion, or speculation about things not visible."
   },
   "generic_style": {
     "description": "Fallback template for any requested style that has no dedicated prompt above",

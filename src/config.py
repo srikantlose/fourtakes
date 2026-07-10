@@ -40,32 +40,32 @@ def load_config():
         or "accounts/fireworks/models/qwen3p7-plus",
         "fireworks_transcription_model": os.getenv("FIREWORKS_TRANSCRIPTION_MODEL")
         or "whisper-v3",
-        "mock_mode": os.getenv("MOCK_MODE", "false").lower() == "true",
+        "mock_mode": (os.getenv("MOCK_MODE") or "false").lower() == "true",
         "frame_interval_seconds": float(
-            os.getenv("FRAME_INTERVAL_SECONDS", "1.5")
+            os.getenv("FRAME_INTERVAL_SECONDS") or "1.5"
         ),
-        "max_frames": int(os.getenv("MAX_FRAMES", "16")),
-        "frame_scale_width": int(os.getenv("FRAME_SCALE_WIDTH", "512")),
+        "max_frames": int(os.getenv("MAX_FRAMES") or "16"),
+        "frame_scale_width": int(os.getenv("FRAME_SCALE_WIDTH") or "512"),
         # Default off: Fireworks deprecated hosted audio inference
         # (docs.fireworks.ai/updates/changelog, "Audio inference and image
         # generation are deprecated") — /audio/transcriptions now returns
         # 401 for every key, so leaving this on just burns retries and time
         # for a call that can never succeed. Transcription stays best-effort
         # (see transcriber.py) in case Fireworks reinstates it.
-        "enable_audio_transcription": os.getenv(
-            "ENABLE_AUDIO_TRANSCRIPTION", "false"
+        "enable_audio_transcription": (
+            os.getenv("ENABLE_AUDIO_TRANSCRIPTION") or "false"
         ).lower() == "true",
         # Submission (task) mode: the judging harness mounts these paths.
-        "tasks_path": os.getenv("TASKS_PATH", "/input/tasks.json"),
-        "results_path": os.getenv("RESULTS_PATH", "/output/results.json"),
-        "max_concurrent_tasks": int(os.getenv("MAX_CONCURRENT_TASKS", "3")),
-        "download_timeout": int(os.getenv("DOWNLOAD_TIMEOUT", "120")),
-        "api_timeout": int(os.getenv("API_TIMEOUT", "60")),
-        "prompts_path": os.getenv("PROMPTS_PATH", str(DEFAULT_PROMPTS_PATH)),
-        "log_level": os.getenv("LOG_LEVEL", "INFO"),
-        "log_file": os.getenv("LOG_FILE", "fourtakes.log"),
-        "output_dir": os.getenv("OUTPUT_DIR", "output"),
-        "temp_dir": os.getenv("TEMP_DIR", ".temp"),
+        "tasks_path": os.getenv("TASKS_PATH") or "/input/tasks.json",
+        "results_path": os.getenv("RESULTS_PATH") or "/output/results.json",
+        "max_concurrent_tasks": int(os.getenv("MAX_CONCURRENT_TASKS") or "3"),
+        "download_timeout": int(os.getenv("DOWNLOAD_TIMEOUT") or "120"),
+        "api_timeout": int(os.getenv("API_TIMEOUT") or "60"),
+        "prompts_path": os.getenv("PROMPTS_PATH") or str(DEFAULT_PROMPTS_PATH),
+        "log_level": os.getenv("LOG_LEVEL") or "INFO",
+        "log_file": os.getenv("LOG_FILE") or "fourtakes.log",
+        "output_dir": os.getenv("OUTPUT_DIR") or "output",
+        "temp_dir": os.getenv("TEMP_DIR") or ".temp",
     }
 
 

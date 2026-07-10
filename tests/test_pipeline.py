@@ -64,6 +64,13 @@ class TestDownsampleFrames(unittest.TestCase):
         self.assertEqual(sampled[0], frames[0])
         self.assertEqual(sampled[-1], frames[-1])
 
+    def test_max_frames_of_one_returns_single_frame(self):
+        # Regression: (max_frames - 1) used to be a zero divisor.
+        frames = [f"f{i}.jpg" for i in range(80)]
+        sampled = downsample_frames(frames, 1)
+        self.assertEqual(len(sampled), 1)
+        self.assertIn(sampled[0], frames)
+
 
 class TestPrompts(unittest.TestCase):
     def test_prompts_file_valid(self):
@@ -187,6 +194,93 @@ class TestBaseUrl(unittest.TestCase):
             pipeline.transcriber.transcription_url,
             "http://judge.proxy:8000/v1/audio/transcriptions",
         )
+
+
+class TestEmptyCompletionContent(unittest.TestCase):
+    """A 200 response with null/empty content (reasoning-model quirk) or a
+    malformed body is a failed call: it must be retried, never returned to
+    the captioner where .strip() on None would kill the whole clip."""
+
+    def _client(self):
+        return FireworksClient(
+            api_key="fake-key", model="m", base_url="http://judge.proxy/v1"
+        )
+
+    @staticmethod
+    def _response(content):
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "choices": [{"message": {"content": content}}],
+            "usage": {"total_tokens": 10},
+        }
+        return response
+
+    def test_empty_content_retries_then_succeeds(self):
+        client = self._client()
+        with patch(
+            "src.fireworks_client.requests.post",
+            side_effect=[self._response(None), self._response("a caption")],
+        ) as mock_post, patch("src.fireworks_client.time.sleep"):
+            text = client.chat_completion([{"role": "user", "content": "hi"}])
+        self.assertEqual(text, "a caption")
+        self.assertEqual(mock_post.call_count, 2)
+
+    def test_all_empty_raises_after_retries(self):
+        from src.fireworks_client import FireworksAPIError
+
+        client = self._client()
+        with patch(
+            "src.fireworks_client.requests.post",
+            return_value=self._response("   "),
+        ) as mock_post, patch("src.fireworks_client.time.sleep"):
+            with self.assertRaises(FireworksAPIError):
+                client.chat_completion([{"role": "user", "content": "hi"}])
+        self.assertEqual(mock_post.call_count, client.max_retries)
+
+    def test_malformed_200_body_is_retried(self):
+        client = self._client()
+        broken = MagicMock(status_code=200)
+        broken.json.side_effect = ValueError("truncated body")
+        with patch(
+            "src.fireworks_client.requests.post",
+            side_effect=[broken, self._response("a caption")],
+        ) as mock_post, patch("src.fireworks_client.time.sleep"):
+            text = client.chat_completion([{"role": "user", "content": "hi"}])
+        self.assertEqual(text, "a caption")
+        self.assertEqual(mock_post.call_count, 2)
+
+
+class TestEmptyStringEnvFallbacks(unittest.TestCase):
+    """Empty-string env values (e.g. a Docker ENV set from an empty ARG)
+    must fall through to defaults instead of crashing numeric parsing at
+    container startup."""
+
+    def test_empty_numeric_env_values_use_defaults(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Point PROJECT_ROOT away from the repo so a real .env.local
+            # can't override the patched environment.
+            with patch("src.config.PROJECT_ROOT", Path(tmpdir)), patch.dict(
+                os.environ,
+                {
+                    "FRAME_INTERVAL_SECONDS": "",
+                    "MAX_FRAMES": "",
+                    "FRAME_SCALE_WIDTH": "",
+                    "MAX_CONCURRENT_TASKS": "",
+                    "DOWNLOAD_TIMEOUT": "",
+                    "API_TIMEOUT": "",
+                    "TASKS_PATH": "",
+                    "MOCK_MODE": "",
+                },
+            ):
+                config = load_config()
+        self.assertEqual(config["frame_interval_seconds"], 1.5)
+        self.assertEqual(config["max_frames"], 16)
+        self.assertEqual(config["frame_scale_width"], 512)
+        self.assertEqual(config["max_concurrent_tasks"], 3)
+        self.assertEqual(config["download_timeout"], 120)
+        self.assertEqual(config["api_timeout"], 60)
+        self.assertEqual(config["tasks_path"], "/input/tasks.json")
+        self.assertFalse(config["mock_mode"])
 
 
 class TestTranscriberDeprecatedEndpoint(unittest.TestCase):

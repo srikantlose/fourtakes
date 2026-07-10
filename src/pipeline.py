@@ -34,6 +34,9 @@ def downsample_frames(frame_paths: List[str], max_frames: int) -> List[str]:
     """
     if len(frame_paths) <= max_frames:
         return frame_paths
+    if max_frames <= 1:
+        # Degenerate config: a single (middle) frame beats a crash.
+        return [frame_paths[len(frame_paths) // 2]]
     step = (len(frame_paths) - 1) / (max_frames - 1)
     indices = [round(i * step) for i in range(max_frames)]
     return [frame_paths[i] for i in indices]

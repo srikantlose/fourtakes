@@ -79,7 +79,7 @@ fourtakes/
 │   └── main.py              # CLI entrypoint (submission + dev modes)
 ├── config/
 │   └── prompts.json         # ALL prompts (base + styles + generic) — edit here
-├── tests/                   # 44 tests, all runnable offline
+├── tests/                   # 49 tests, all runnable offline
 ├── Dockerfile
 ├── .env.template            # copy to .env.local and fill in
 └── requirements.txt
@@ -154,7 +154,7 @@ Track 2 deliverables, all linked from this repository:
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-44 tests, all runnable offline — no API key, credits, or ffmpeg required (extraction, downloads, and API calls are mocked).
+49 tests, all runnable offline — no API key, credits, or ffmpeg required (extraction, downloads, and API calls are mocked).
 
 ## Configuration Reference
 
