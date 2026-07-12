@@ -145,8 +145,8 @@ Track 2 deliverables, all linked from this repository:
 
 - **Code:** this repo — https://github.com/srikantlose/fourtakes
 - **Docker image:** https://hub.docker.com/r/srikantlose/fourtakes — `docker pull srikantlose/fourtakes:latest`
-- **Demo video:** _TODO_
-- **Slide deck:** _TODO_
+- **Demo video:** https://youtu.be/gCys6gv5Hns
+- **Slide deck:** https://gamma.app/docs/FourTakes-One-Video-Four-Voices-7pynax5jcnkue2
 
 ## Tests
 
