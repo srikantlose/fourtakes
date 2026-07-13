@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FourTakes — Demo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="page-header">
+    <div class="wordmark">FourTakes</div>
+    <p class="tagline">Watch a clip once. Get four voices back — formal, sarcastic, tech-humor, everyday-humor — from a single shared caption, powered by Qwen 3.7 Plus on Fireworks AI.</p>
+  </header>
+
+  <main class="layout">
+    <section class="card upload-card">
+      <div id="dropzone" class="dropzone">
+        <input type="file" id="fileInput" accept="video/*" hidden>
+        <div id="dropzoneEmpty" class="dropzone-empty">
+          <div class="dropzone-icon">&#9654;</div>
+          <p class="dropzone-title">Drop a video here</p>
+          <p class="dropzone-sub">or click to browse — MP4, MOV, WEBM, MKV</p>
+        </div>
+        <video id="preview" class="preview" controls hidden></video>
+      </div>
+
+      <div class="controls">
+        <label class="mock-toggle">
+          <input type="checkbox" id="mockCheckbox">
+          <span>Mock mode (no API calls)</span>
+        </label>
+        <button id="generateBtn" class="generate-btn" disabled>Generate captions</button>
+      </div>
+
+      <ol class="stepper" id="stepper">
+        <li class="step" data-step="frames">
+          <span class="step-dot"></span>
+          <span class="step-label">Extracting frames</span>
+        </li>
+        <li class="step" data-step="base">
+          <span class="step-dot"></span>
+          <span class="step-label">Base caption</span>
+        </li>
+        <li class="step" data-step="styles">
+          <span class="step-dot"></span>
+          <span class="step-label">Four takes</span>
+        </li>
+      </ol>
+
+      <div id="errorBanner" class="error-banner" hidden></div>
+      <div id="runSummary" class="run-summary" hidden></div>
+    </section>
+
+    <section class="card result-card">
+      <div class="base-caption-block">
+        <h2 class="section-title">Base caption</h2>
+        <p id="baseCaption" class="base-caption-text placeholder">Waiting for a clip&hellip;</p>
+      </div>
+
+      <div class="tabs" id="tabs">
+        <div class="tab-bar" role="tablist">
+          <button class="tab-btn active" data-style="formal" role="tab">Formal</button>
+          <button class="tab-btn" data-style="sarcastic" role="tab">Sarcastic</button>
+          <button class="tab-btn" data-style="humorous_tech" role="tab">Tech humor</button>
+          <button class="tab-btn" data-style="humorous_non_tech" role="tab">Everyday humor</button>
+        </div>
+        <div class="tab-panels">
+          <div class="tab-panel active" data-style="formal">
+            <p class="caption-text placeholder">No caption yet</p>
+            <button class="copy-btn" hidden>Copy</button>
+          </div>
+          <div class="tab-panel" data-style="sarcastic">
+            <p class="caption-text placeholder">No caption yet</p>
+            <button class="copy-btn" hidden>Copy</button>
+          </div>
+          <div class="tab-panel" data-style="humorous_tech">
+            <p class="caption-text placeholder">No caption yet</p>
+            <button class="copy-btn" hidden>Copy</button>
+          </div>
+          <div class="tab-panel" data-style="humorous_non_tech">
+            <p class="caption-text placeholder">No caption yet</p>
+            <button class="copy-btn" hidden>Copy</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

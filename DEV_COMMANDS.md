@@ -137,6 +137,38 @@ MOCK_MODE=true python -m src.main --tasks input/tasks.json --results output/resu
 python -m json.tool output/results.json
 ```
 
+## Local Demo Web UI
+
+Not part of the submission — dev-only, separate `requirements-web.txt` (Flask), never copied into the Docker image.
+
+### Install and run
+```bash
+pip install -r requirements-web.txt
+python -m webapp.server
+# open http://127.0.0.1:5000
+```
+
+### Run the webapp tests
+```bash
+# Skips cleanly if flask isn't installed
+python -m unittest tests.test_webapp -v
+```
+
+### Exercise the API directly (no browser)
+```bash
+# Submit a clip in mock mode
+curl -s -X POST http://127.0.0.1:5000/api/caption -F "video=@sample.mp4" -F "mock=true"
+# -> {"job_id": "..."}
+
+# Stream the live events for that job
+curl -s -N http://127.0.0.1:5000/api/events/<job_id>
+```
+
+### Troubleshooting
+- Port 5000 already in use: another instance is still running — find it with `netstat -ano | grep :5000` (Windows) and stop it, or edit the port in `webapp/server.py`'s `main()`.
+- Upload succeeds but the job immediately errors on "Could not determine video duration": the file isn't a real video ffprobe can read (e.g. a text file with a `.mp4` name) — this is expected, not a bug.
+- Nothing happens after clicking "Generate captions": open the browser devtools Network tab and check the `/api/events/<job_id>` request stayed open (EventSource); if the server log shows the job completed but the UI didn't update, it's a frontend issue in `webapp/static/app.js`, not the pipeline.
+
 ## Frame Extraction Testing
 
 ### Extract frames from a video (Python script)

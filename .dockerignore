@@ -12,3 +12,5 @@ output
 tests
 docker
 *.md
+webapp
+requirements-web.txt

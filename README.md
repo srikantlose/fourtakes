@@ -116,6 +116,18 @@ python -m src.main path/to/clip.mp4 --mock
 python -m src.main clip.mp4 --model accounts/fireworks/models/some-model
 ```
 
+## Interactive demo (local web UI)
+
+A small Flask app for driving the pipeline from a browser instead of the CLI: drag a clip in, watch frame extraction and all four styled captions land live as they complete. Not part of the submission — the Dockerfile never copies `webapp/`, and its one extra dependency (Flask) lives in a separate `requirements-web.txt`, not `requirements.txt`.
+
+```bash
+pip install -r requirements-web.txt
+python -m webapp.server
+# open http://127.0.0.1:5000
+```
+
+Drop a video (or click to browse), optionally tick "Mock mode" to try it with no API calls, then hit **Generate captions**. The base caption appears first, then the four tabs (Formal / Sarcastic / Tech humor / Everyday humor) fill in as each style call completes.
+
 ## Docker
 
 The judging harness injects `FIREWORKS_API_KEY` and `FIREWORKS_BASE_URL` (its API proxy) as **environment variables at container runtime**. The code reads both from the environment at startup, so the submission image needs no credentials baked in:
