@@ -128,6 +128,8 @@ python -m webapp.server
 
 Drop a video (or click to browse), optionally tick "Mock mode" to try it with no API calls, then hit **Generate captions**. The base caption appears first, then the four tabs (Formal / Sarcastic / Tech humor / Everyday humor) fill in as each style call completes.
 
+There's also an always-on, browser-hosted version of this same idea: see "Live demo (Vercel)" under [Submission](#submission) below.
+
 ## Docker
 
 The judging harness injects `FIREWORKS_API_KEY` and `FIREWORKS_BASE_URL` (its API proxy) as **environment variables at container runtime**. The code reads both from the environment at startup, so the submission image needs no credentials baked in:
@@ -159,6 +161,7 @@ Track 2 deliverables, all linked from this repository:
 - **Docker image:** https://hub.docker.com/r/srikantlose/fourtakes — `docker pull srikantlose/fourtakes:latest`
 - **Demo video:** https://youtu.be/gCys6gv5Hns
 - **Slide deck:** https://gamma.app/docs/FourTakes-One-Video-Four-Voices-7pynax5jcnkue2
+- **Live demo (Vercel):** code at https://github.com/srikantlose/FourTakes-demo — same drag-and-drop, live-per-style idea as the local web UI above, rearchitected for serverless (frame extraction runs in the browser via canvas, no ffmpeg; four parallel API calls instead of SSE). Deploy URL: _add once deployed on Vercel_. Not part of the judged submission — a separate always-on showcase.
 
 ## Tests
 
