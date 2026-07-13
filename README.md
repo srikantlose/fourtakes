@@ -161,7 +161,7 @@ Track 2 deliverables, all linked from this repository:
 - **Docker image:** https://hub.docker.com/r/srikantlose/fourtakes — `docker pull srikantlose/fourtakes:latest`
 - **Demo video:** https://youtu.be/gCys6gv5Hns
 - **Slide deck:** https://gamma.app/docs/FourTakes-One-Video-Four-Voices-7pynax5jcnkue2
-- **Live demo (Vercel):** code at https://github.com/srikantlose/FourTakes-demo — same drag-and-drop, live-per-style idea as the local web UI above, rearchitected for serverless (frame extraction runs in the browser via canvas, no ffmpeg; four parallel API calls instead of SSE). Deploy URL: _add once deployed on Vercel_. Not part of the judged submission — a separate always-on showcase.
+- **Live demo (Vercel):** https://four-takes-demo.vercel.app/ — same drag-and-drop, live-per-style idea as the local web UI above, rearchitected for serverless (frame extraction runs in the browser via canvas, no ffmpeg; four parallel API calls instead of SSE). Source: https://github.com/srikantlose/FourTakes-demo. Not part of the judged submission — a separate always-on showcase.
 
 ## Tests
 
